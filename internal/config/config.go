@@ -49,11 +49,7 @@ func (config Config) SetUser() {
 func Read() Config {
 
 	// Find the home directory
-	file_path, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatal("Failed to retrieve home directory for user")
-	}
-
+	file_path, err := getHomeDir()
 	full_path := file_path + "/" + configFileName
 
 	// Read the configuration file called gatorconfig.json
