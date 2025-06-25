@@ -1,11 +1,14 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"os"
 
 	commandHanlder "github.com/TheHawk24/gator/internal/commands"
 	"github.com/TheHawk24/gator/internal/config"
+	"github.com/TheHawk24/gator/internal/database"
+	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -13,24 +16,37 @@ func main() {
 	var state commandHanlder.State
 
 	config_file := config.Read()
-	state.Config = &config_file
 
-	commands := commandHanlder.Commands{}
-	commands.Commands_all = make(map[string]func(*commandHanlder.State, commandHanlder.Command) error)
-	commands.Register("login", commandHanlder.HandlerLogin)
+	// Connect to the database
+	dbURL := config_file.Db_url
 
-	args := os.Args
-	if len(args) < 2 {
-		log.Fatal("Please specify command to use")
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		log.Fatal("Failed to connect to the database")
 	}
 
-	var command_name_handle commandHanlder.Command
-	commnand_name := args[1]
-	command_line_args := args[2:]
-	command_name_handle.Name = commnand_name
-	command_name_handle.Args = command_line_args
+	dbQueries := database.New(db)
 
-	err := commands.Run(&state, command_name_handle)
+	state.Config = &config_file
+	state.Db = dbQueries
+
+	//Store commands
+	commands_storage := commandHanlder.Commands{}
+	commands_storage.Commands_all = make(map[string]func(*commandHanlder.State, commandHanlder.Command) error)
+	commands_storage.Register("register", commandHanlder.HandlerRegister)
+	commands_storage.Register("login", commandHanlder.HandlerLogin)
+
+	//Get command line arguments
+	args := os.Args
+	if len(args) < 2 {
+		log.Fatal("Please speicfy command to use")
+	}
+
+	var run_command commandHanlder.Command
+	run_command.Name = args[1]
+	run_command.Args = args[2:]
+	//
+	err = commands_storage.Run(&state, run_command)
 	if err != nil {
 		log.Fatal(err)
 	}
