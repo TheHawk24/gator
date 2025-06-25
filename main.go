@@ -35,6 +35,9 @@ func main() {
 	commands_storage.Commands_all = make(map[string]func(*commandHanlder.State, commandHanlder.Command) error)
 	commands_storage.Register("register", commandHanlder.HandlerRegister)
 	commands_storage.Register("login", commandHanlder.HandlerLogin)
+	commands_storage.Register("reset", commandHanlder.HandlerReset)
+	commands_storage.Register("users", commandHanlder.HandlerListUsers)
+	commands_storage.Register("agg", commandHanlder.HandlerAgg)
 
 	//Get command line arguments
 	args := os.Args
@@ -48,7 +51,8 @@ func main() {
 	//
 	err = commands_storage.Run(&state, run_command)
 	if err != nil {
-		log.Fatal(err)
+		//log.Fatal(err)
+		os.Exit(1)
 	}
 
 }
