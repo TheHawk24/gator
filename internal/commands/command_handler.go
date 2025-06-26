@@ -163,3 +163,41 @@ func HandlerAgg(s *State, cmd Command) error {
 	display_feed(feed)
 	return nil
 }
+
+func HandlerAddFeed(s *State, cmd Command) error {
+
+	if len(cmd.Args) < 2 {
+		err := fmt.Sprintf("%v expects a two arguments, a feed name and url", cmd.Name)
+		fmt.Println(err)
+		return errors.New(err)
+	}
+
+	//Check if user exists
+	current_user := s.Config.Current_Username
+	user_info, err := s.Db.GetUser(context.Background(), current_user)
+	if err != nil {
+		log.Println("Cannot add feed for uknown user")
+		return err
+	}
+
+	feed_name := cmd.Args[0]
+	url := cmd.Args[1]
+
+	//Add feed for user
+	var database_feed database.CreateFeedParams
+	database_feed.ID = uuid.New()
+	database_feed.Name = feed_name
+	database_feed.CreatedAt = time.Now()
+	database_feed.UpdatedAt = time.Now()
+	database_feed.Url = url
+	database_feed.UserID = user_info.ID
+
+	_, err = s.Db.CreateFeed(context.Background(), database_feed)
+	if err != nil {
+		log.Println("Failed to add feed")
+		return err
+	}
+
+	return nil
+
+}

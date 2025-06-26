@@ -38,6 +38,7 @@ func main() {
 	commands_storage.Register("reset", commandHanlder.HandlerReset)
 	commands_storage.Register("users", commandHanlder.HandlerListUsers)
 	commands_storage.Register("agg", commandHanlder.HandlerAgg)
+	commands_storage.Register("addfeed", commandHanlder.HandlerAddFeed)
 
 	//Get command line arguments
 	args := os.Args
