@@ -39,6 +39,9 @@ func main() {
 	commands_storage.Register("users", commandHanlder.HandlerListUsers)
 	commands_storage.Register("agg", commandHanlder.HandlerAgg)
 	commands_storage.Register("addfeed", commandHanlder.HandlerAddFeed)
+	commands_storage.Register("feeds", commandHanlder.HandlerFeeds)
+	commands_storage.Register("follow", commandHanlder.HandlerFollow)
+	commands_storage.Register("following", commandHanlder.HandlerFollowing)
 
 	//Get command line arguments
 	args := os.Args

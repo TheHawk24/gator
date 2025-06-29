@@ -192,12 +192,120 @@ func HandlerAddFeed(s *State, cmd Command) error {
 	database_feed.Url = url
 	database_feed.UserID = user_info.ID
 
-	_, err = s.Db.CreateFeed(context.Background(), database_feed)
+	feed, err := s.Db.CreateFeed(context.Background(), database_feed)
 	if err != nil {
 		log.Println("Failed to add feed")
 		return err
 	}
 
+	//FOLLOW FEED
+
+	var feedFollow database.CreateFeedFollowsParams
+	feedFollow.ID = uuid.New()
+	feedFollow.CreatedAt = time.Now()
+	feedFollow.UpdatedAt = time.Now()
+	feedFollow.UserID = user_info.ID
+	feedFollow.FeedID = feed.ID
+	_, err = s.Db.CreateFeedFollows(context.Background(), feedFollow)
+	if err != nil {
+		log.Println("Failed to follow feed")
+	}
+
 	return nil
 
+}
+
+func HandlerFeeds(s *State, cmd Command) error {
+
+	//Fetch feeds from database
+	feeds, err := s.Db.GetUsersFeeds(context.Background())
+	if err != nil {
+		log.Println("Failed to fetch all feeds")
+		return err
+	}
+
+	if len(feeds) == 0 {
+		err := fmt.Sprintf("No feeds founds")
+		log.Println(err)
+		return fmt.Errorf(err)
+	}
+
+	for _, v := range feeds {
+		name := v.Name
+		url := v.Url
+		username := v.Name_2
+		fmt.Println("--------------------------------------------------------")
+		fmt.Printf("Feed Name: %v\n", name)
+		fmt.Printf("URL: %v\n", url)
+		fmt.Printf("User name: %v\n", username)
+		fmt.Println("--------------------------------------------------------")
+	}
+
+	return nil
+}
+
+func HandlerFollow(s *State, cmd Command) error {
+
+	if len(cmd.Args) == 0 {
+		err := fmt.Errorf("Command follow expects a single argument, a url")
+		log.Println(err)
+		return err
+	}
+
+	url := cmd.Args[0]
+	feed, err := s.Db.GetFeed(context.Background(), url)
+	if err != nil {
+		log.Println("This feed does not exist")
+		return err
+	}
+
+	username := s.Config.Current_Username
+	user_info, err := s.Db.GetUser(context.Background(), username)
+	if err != nil {
+		log.Println("User does not exist")
+		return err
+	}
+
+	//Get user id and feed Id
+	userid := user_info.ID
+	feedID := feed.ID
+
+	var feedFollow database.CreateFeedFollowsParams
+	feedFollow.ID = uuid.New()
+	feedFollow.CreatedAt = time.Now()
+	feedFollow.UpdatedAt = time.Now()
+	feedFollow.UserID = userid
+	feedFollow.FeedID = feedID
+	user_feed_follow, err := s.Db.CreateFeedFollows(context.Background(), feedFollow)
+	if err != nil {
+		log.Println("Failed to follow feed")
+	}
+
+	fmt.Printf("UserName: %v\n", user_feed_follow.UserName)
+	fmt.Printf("FeedName: %v\n", user_feed_follow.FeedName)
+
+	return nil
+}
+
+func HandlerFollowing(s *State, cmd Command) error {
+
+	username := s.Config.Current_Username
+	user_info, err := s.Db.GetUser(context.Background(), username)
+	if err != nil {
+		log.Println("User does not exist")
+		return err
+	}
+
+	allfeeds, err := s.Db.GetFeedFollowsForUser(context.Background(), user_info.ID)
+	if err != nil {
+		log.Println("Failed to get feed follows for user")
+		return err
+	}
+
+	fmt.Printf("%v follows this feeds\n", user_info.Name)
+	for _, v := range allfeeds {
+		fmt.Println(v.FeedName)
+	}
+
+	return nil
 }

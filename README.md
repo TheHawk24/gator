@@ -1,4 +1,4 @@
 # RSS feed aggregator
 
 ## TODO
-- Rename variables for readabilty
+- Rename fields on inner join so no confusion is caused
