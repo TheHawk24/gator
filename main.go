@@ -38,10 +38,11 @@ func main() {
 	commands_storage.Register("reset", commandHanlder.HandlerReset)
 	commands_storage.Register("users", commandHanlder.HandlerListUsers)
 	commands_storage.Register("agg", commandHanlder.HandlerAgg)
-	commands_storage.Register("addfeed", commandHanlder.HandlerAddFeed)
+	commands_storage.Register("addfeed", commandHanlder.MiddlewareLoggedIn(commandHanlder.HandlerAddFeed))
 	commands_storage.Register("feeds", commandHanlder.HandlerFeeds)
-	commands_storage.Register("follow", commandHanlder.HandlerFollow)
-	commands_storage.Register("following", commandHanlder.HandlerFollowing)
+	commands_storage.Register("follow", commandHanlder.MiddlewareLoggedIn(commandHanlder.HandlerFollow))
+	commands_storage.Register("following", commandHanlder.MiddlewareLoggedIn(commandHanlder.HandlerFollowing))
+	commands_storage.Register("unfollow", commandHanlder.MiddlewareLoggedIn(commandHanlder.HandlerUnfollow))
 
 	//Get command line arguments
 	args := os.Args

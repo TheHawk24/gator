@@ -151,33 +151,64 @@ func display_feed(feed *rss.RSSFeed) {
 
 }
 
+func scrapeFeeds(s *State) error {
+
+	//Fetch Next Feeed
+	feed, err := s.Db.GetNextFeedToFetch(context.Background())
+	if err != nil {
+		log.Println("Failed to fetch next feed")
+		return err
+	}
+
+	var mark database.MarkFeedFetchedParams
+	mark.ID = feed.ID
+	mark.LastFetchedAt.Time = time.Now()
+	mark.LastFetchedAt.Valid = true
+	mark.UpdatedAt = time.Now()
+
+	err = s.Db.MarkFeedFetched(context.Background(), mark)
+	if err != nil {
+		log.Println("Failed to mark the fetched feed")
+		return err
+	}
+
+	posts, err := rss.FetchFeed(context.Background(), feed.Url)
+	if err != nil {
+		log.Println("Failed to fetch posts from feed")
+		return err
+	}
+
+	for _, v := range posts.Channel.Item {
+		fmt.Println(v.Title)
+	}
+
+	return nil
+}
+
 func HandlerAgg(s *State, cmd Command) error {
 
-	url := "https://www.wagslane.dev/index.xml"
-	feed, err := rss.FetchFeed(context.Background(), url)
-	if err != nil {
+	if len(cmd.Args) == 0 {
+		err := fmt.Errorf("agg command takes one argument")
 		log.Println(err)
 		return err
 	}
 
-	display_feed(feed)
-	return nil
+	//Parse the time string
+	time_count, _ := time.ParseDuration(cmd.Args[0])
+	fmt.Printf("Collecting feeds every %v\n", time_count)
+
+	ticker := time.NewTicker(time_count)
+	for ; ; <-ticker.C {
+		scrapeFeeds(s)
+	}
 }
 
-func HandlerAddFeed(s *State, cmd Command) error {
+func HandlerAddFeed(s *State, cmd Command, user_info database.User) error {
 
 	if len(cmd.Args) < 2 {
 		err := fmt.Sprintf("%v expects a two arguments, a feed name and url", cmd.Name)
 		fmt.Println(err)
 		return errors.New(err)
-	}
-
-	//Check if user exists
-	current_user := s.Config.Current_Username
-	user_info, err := s.Db.GetUser(context.Background(), current_user)
-	if err != nil {
-		log.Println("Cannot add feed for uknown user")
-		return err
 	}
 
 	feed_name := cmd.Args[0]
@@ -244,7 +275,7 @@ func HandlerFeeds(s *State, cmd Command) error {
 	return nil
 }
 
-func HandlerFollow(s *State, cmd Command) error {
+func HandlerFollow(s *State, cmd Command, user_info database.User) error {
 
 	if len(cmd.Args) == 0 {
 		err := fmt.Errorf("Command follow expects a single argument, a url")
@@ -256,13 +287,6 @@ func HandlerFollow(s *State, cmd Command) error {
 	feed, err := s.Db.GetFeed(context.Background(), url)
 	if err != nil {
 		log.Println("This feed does not exist")
-		return err
-	}
-
-	username := s.Config.Current_Username
-	user_info, err := s.Db.GetUser(context.Background(), username)
-	if err != nil {
-		log.Println("User does not exist")
 		return err
 	}
 
@@ -287,14 +311,7 @@ func HandlerFollow(s *State, cmd Command) error {
 	return nil
 }
 
-func HandlerFollowing(s *State, cmd Command) error {
-
-	username := s.Config.Current_Username
-	user_info, err := s.Db.GetUser(context.Background(), username)
-	if err != nil {
-		log.Println("User does not exist")
-		return err
-	}
+func HandlerFollowing(s *State, cmd Command, user_info database.User) error {
 
 	allfeeds, err := s.Db.GetFeedFollowsForUser(context.Background(), user_info.ID)
 	if err != nil {
@@ -308,4 +325,54 @@ func HandlerFollowing(s *State, cmd Command) error {
 	}
 
 	return nil
+}
+
+func HandlerUnfollow(s *State, cmd Command, user_info database.User) error {
+
+	//Fetch Feed id
+	if len(cmd.Args) == 0 {
+		err := fmt.Errorf("Command unfollow expects a single argument, a url")
+		log.Println(err)
+		return err
+	}
+
+	url := cmd.Args[0]
+	feed, err := s.Db.GetFeed(context.Background(), url)
+	if err != nil {
+		log.Println("Feed does not exist")
+		return err
+	}
+
+	userID := user_info.ID
+	feedID := feed.ID
+
+	// Delete feed follow
+	feed_follow := database.DeleteFeedFollowParams{
+		UserID: userID,
+		FeedID: feedID,
+	}
+	err = s.Db.DeleteFeedFollow(context.Background(), feed_follow)
+	if err != nil {
+		log.Println("Failed to detele feed follow")
+		return err
+	}
+
+	fmt.Println("Successfully deleted feed follow")
+
+	return nil
+}
+
+func MiddlewareLoggedIn(handler func(s *State, cmd Command, user_info database.User) error) func(s *State, cmd Command) error {
+
+	return func(s *State, cmd Command) error {
+
+		current_user := s.Config.Current_Username
+		user, err := s.Db.GetUser(context.Background(), current_user)
+		if err != nil {
+			log.Println("User does not exist")
+			return err
+		}
+
+		return handler(s, cmd, user)
+	}
 }

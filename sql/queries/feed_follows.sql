@@ -14,3 +14,6 @@ SELECT  f.id, f.created_at, f.updated_at, f.user_id, f.feed_id, feeds.name AS fe
 FROM feed_follows f
 INNER JOIN feeds ON feeds.id = feed_id
 WHERE f.user_id = $1;
+
+-- name: DeleteFeedFollow :exec
+DELETE FROM feed_follows WHERE user_id = $1 AND feed_id = $2;
