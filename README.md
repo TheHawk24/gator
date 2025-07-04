@@ -5,7 +5,10 @@
 * Go
 
 # How to Install
-`go install github.com/TheHawk24/gator`
+```
+go install github.com/TheHawk24/gator@latest
+
+```
 
 
 
