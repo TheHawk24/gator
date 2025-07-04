@@ -1,4 +1,11 @@
-# RSS feed aggregator
+# Gator (RSS Feed Aggregator)
 
-## TODO
-- Rename fields on inner join so no confusion is caused
+# Reuirements
+* Postgres
+* Go
+
+# How to Install
+
+
+
+
