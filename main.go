@@ -43,6 +43,7 @@ func main() {
 	commands_storage.Register("follow", commandHanlder.MiddlewareLoggedIn(commandHanlder.HandlerFollow))
 	commands_storage.Register("following", commandHanlder.MiddlewareLoggedIn(commandHanlder.HandlerFollowing))
 	commands_storage.Register("unfollow", commandHanlder.MiddlewareLoggedIn(commandHanlder.HandlerUnfollow))
+	commands_storage.Register("browse", commandHanlder.MiddlewareLoggedIn(commandHanlder.HandlerBrowse))
 
 	//Get command line arguments
 	args := os.Args

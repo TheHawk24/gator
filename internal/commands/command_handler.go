@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/TheHawk24/gator/internal/config"
 	"github.com/TheHawk24/gator/internal/database"
 	"github.com/TheHawk24/gator/internal/rss"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type State struct {
@@ -151,13 +153,38 @@ func display_feed(feed *rss.RSSFeed) {
 
 }
 
-func scrapeFeeds(s *State) error {
+func parseTime(time_input string) (time.Time, error) {
+	layouts := []string{
+		time.Layout,
+		time.ANSIC,
+		time.UnixDate,
+		time.RubyDate,
+		time.RFC822,
+		time.RFC822Z,
+		time.RFC850,
+		time.RFC1123,
+		time.RFC1123Z,
+		time.RFC3339,
+		time.RFC3339Nano,
+		time.Kitchen,
+	}
+
+	for _, layout := range layouts {
+		t, err := time.Parse(layout, time_input)
+		if err == nil {
+			return t, err
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("Unable to parse time: %s", time_input)
+}
+
+func scrapeFeeds(s *State) {
 
 	//Fetch Next Feeed
 	feed, err := s.Db.GetNextFeedToFetch(context.Background())
 	if err != nil {
 		log.Println("Failed to fetch next feed")
-		return err
 	}
 
 	var mark database.MarkFeedFetchedParams
@@ -169,20 +196,38 @@ func scrapeFeeds(s *State) error {
 	err = s.Db.MarkFeedFetched(context.Background(), mark)
 	if err != nil {
 		log.Println("Failed to mark the fetched feed")
-		return err
 	}
 
 	posts, err := rss.FetchFeed(context.Background(), feed.Url)
 	if err != nil {
 		log.Println("Failed to fetch posts from feed")
-		return err
 	}
 
 	for _, v := range posts.Channel.Item {
-		fmt.Println(v.Title)
+		var save_post database.CreatePostParams
+		save_post.ID = uuid.New()
+		save_post.FeedID = feed.ID
+		save_post.CreatedAt = time.Now()
+		save_post.UpdatedAt = time.Now()
+		save_post.Title = v.Title
+		save_post.Url = v.Link
+		save_post.Description.String = v.Description
+		save_post.Description.Valid = true
+		t, err := parseTime(v.PubDate)
+		if err != nil {
+			log.Println(err)
+		}
+		save_post.PublishedAt = t
+		_, err = s.Db.CreatePost(context.Background(), save_post)
+		if err != nil {
+			if _, ok := err.(*pq.Error); ok {
+				//log.Println(err)
+			} else {
+				log.Println(err)
+			}
+		}
 	}
 
-	return nil
 }
 
 func HandlerAgg(s *State, cmd Command) error {
@@ -201,6 +246,39 @@ func HandlerAgg(s *State, cmd Command) error {
 	for ; ; <-ticker.C {
 		scrapeFeeds(s)
 	}
+}
+
+func HandlerBrowse(s *State, cmd Command, user_info database.User) error {
+
+	var limit int
+	if len(cmd.Args) == 0 {
+		limit = 2
+	} else if len(cmd.Args) == 1 {
+		limit, _ = strconv.Atoi(cmd.Args[0])
+	}
+
+	var post_info database.GetPostsForUserParams
+	post_info.Limit = int32(limit)
+	post_info.UserID = user_info.ID
+
+	posts, err := s.Db.GetPostsForUser(context.Background(), post_info)
+	if err != nil {
+		log.Println("Failed to retrieve posts from feeds user follows")
+		return err
+	}
+
+	for _, v := range posts {
+		fmt.Println("----------------------------------------------------------------")
+		fmt.Printf("Title: %v\n", v.Title)
+		fmt.Printf("Link: %v\n", v.Url)
+		fmt.Printf("PubDate: %v\n", v.PublishedAt)
+		fmt.Printf("===============Description====================\n")
+		fmt.Println(v.Description)
+		fmt.Printf("===============Description====================\n")
+		fmt.Println("----------------------------------------------------------------")
+	}
+
+	return nil
 }
 
 func HandlerAddFeed(s *State, cmd Command, user_info database.User) error {
